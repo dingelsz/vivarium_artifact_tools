@@ -197,4 +197,3 @@ class ArtifactTool():
         results['risk'] = pd.Series([risk_factor for _ in range(len(results))])
         results['relative_risk'] = pd.Series(risks)
         return results
-at = ArtifactTool('')
