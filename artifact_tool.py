@@ -44,7 +44,7 @@ def reduce_draws(table, val_col="value"):
     # remove the values column from our drawless table and add columns for the
     # stats we want
     result_df = drawless_table[columns].sort_values(by=columns)
-    result_df['average'] = [value_df[col].values.mean() for col in identifiers]
+    result_df[val_col + "_mean"] = [value_df[col].values.mean() for col in identifiers]
     result_df['lower 2.5'] = [np.percentile(value_df[col].values, 2.5) for col in identifiers]
     result_df['upper 97.5'] = [np.percentile(value_df[col].values, 97.5) for col in identifiers]
     result_df = result_df.reset_index(drop=True)
@@ -91,21 +91,6 @@ def add_population(table, pop_table):
     return table
 
 
-# ------- Tests/Scratch ----------
-# hdf = pd.HDFStore('/Users/Zach/Projects/IHME/bfp_nigeria.hdf')
-# table_load = hdf.get('/risk_factor/child_stunting/exposure')
-# table = table_load.query('age <= 5 and year == 2016')
-#
-# table = reduce_draws(table)
-# pop_table = hdf.get('/population/structure')
-# table = add_population(table, pop_table)
-# table['exposed'] = table.average * table.population
-#
-# exposure_table = table.groupby(['parameter']).aggregate(np.sum)
-# exposure_table['percent'] = exposure_table.exposed / exposure_table.population
-# exposure_table.percent.tolist()
-
-
 class ArtifactTool():
     # TODO Write a query parser that checks if query is valid for table
 
@@ -124,12 +109,12 @@ class ArtifactTool():
             self._str = msg
         return self._str
 
-    @lru_cache(maxsize = 32)
+    @lru_cache(maxsize=32)
     def get_population_for_year(self, year=2016):
         table = self._hdf.get('/population/structure')
         return table[table.year == year].population.sum() / 2
 
-    @lru_cache(maxsize = 32)
+    @lru_cache(maxsize=32)
     def get_population_for_year_and_age(self, year=2016, lower=0, upper=5):
         table = self._hdf.get('/population/structure')
         table = table[table.year == year]
@@ -137,13 +122,13 @@ class ArtifactTool():
         table = table[table.age >= lower]
         return table.population.sum() / 2
 
-    @lru_cache(maxsize = 32)
-    def get_deaths_for_year(self, year = 2016):
+    @lru_cache(maxsize=32)
+    def get_deaths_for_year(self, year=2016):
         table = self._hdf.get('/cause/all_causes/death')
         table = table[table.year == year]
         return table.value.sum() / 1000 / 2
 
-    @lru_cache(maxsize = 32)
+    @lru_cache(maxsize=32)
     def get_deaths_for_year_and_age(self, year=2016, lower=0, upper=5):
         table = self._hdf.get('/cause/all_causes/death')
         table = table[table.year == year]
@@ -152,7 +137,7 @@ class ArtifactTool():
         return table.value.sum() / 1000 / 2
 
     @lru_cache(maxsize=32)
-    def get_live_birth_rate(self, year = 2016):
+    def get_live_birth_rate(self, year=2016):
         table = self._hdf.get('/covariate/live_births_by_sex/estimate')
         table = table[table.year == year]
         return table.mean_value.sum() / 2
@@ -187,23 +172,29 @@ class ArtifactTool():
         return pd.DataFrame(exposure_table.percent.tolist(), columns=['rate'], index=exposure_table.index)
 
     @lru_cache(maxsize=32)
-    def get_relative_risk_by_year(self, risk_factor, year=2016):
+    def get_relative_risk_by_year_and_age(self, risk_factor, year=2016, lower=0, upper=5):
         table = self._hdf.get('/risk_factor/' + risk_factor + '/relative_risk')
         table = table[table.year == year]
+        table = table[table.age <= upper]
+        table = table[table.age >= lower]
 
         table = reduce_draws(table)
+        # TODO Remove population is we don't need it
         pop_table = self._hdf.get('/population/structure')
         table = add_population(table, pop_table)
+        table = table.sort_values(by=['cause', 'parameter'])
 
+        weighted_risk = table.population * table.value_mean
 
-#hdf = pd.HDFStore('/Users/Zach/Projects/IHME/bfp_nigeria.hdf')
+        risks = []
+        groups = table.groupby(['cause', 'parameter']).groups
+        for key in groups:
+            group_risks = weighted_risk.loc[groups[key]]
+            risk_for_group = group_risks.sum() / table.population.loc[groups[key]].sum()
+            risks.append(risk_for_group)
 
-at = ArtifactTool('/Users/Zach/Projects/IHME/bfp_nigeria.hdf')
-
-table = at._hdf.get('/risk_factor/child_stunting/relative_risk')
-table = table[table.year == 2016]
-
-table = reduce_draws(table)
-
-pop_table = at._hdf.get('/population/structure')
-table = add_population(table, pop_table)
+        results = pd.DataFrame(list(groups.keys()), columns=['causes', 'parameter'])
+        results['risk'] = pd.Series([risk_factor for _ in range(len(results))])
+        results['relative_risk'] = pd.Series(risks)
+        return results
+at = ArtifactTool('')
