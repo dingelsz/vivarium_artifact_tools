@@ -108,7 +108,6 @@ class ArtifactTool():
 
         table = self._reduce_draws(table)
         # TODO Remove population is we don't need it
-        pop_table = self._hdf.get('/population/structure')
         table = self._add_population(table)
         table = table.sort_values(by=['cause', 'parameter'])
 
@@ -172,7 +171,6 @@ class ArtifactTool():
         result_df = result_df.reset_index(drop=True)
 
         return result_df
-
 
     def _add_population(self, table):
         """ Maps data on age, sex and year to populations.
