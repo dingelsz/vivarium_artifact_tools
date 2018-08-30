@@ -11,15 +11,30 @@ class ArtifactTool():
         self._path = path
         self._hdf = pd.HDFStore(path)
         self._str = None
-        # TODO Collect list of risk_factors and causes
+        self._parse_paths()
+
+    def _parse_paths(self):
+        # Create sets of causes and risks and create a message
+        # to be called when the user prints the AT
+        self._causes = set()
+        self._risks = set()
+
+        self._str = "HDF: " + self._path + "\n"
+        self._str += "---Table Map---\n"
+
+        for item in self._hdf.items():
+            path_list = item[0].split('/')
+            path_list = path_list[1:]
+
+            # Collect risks and causes
+            if path_list[0] == 'cause':
+                self._causes.add(path_list[1])
+            if path_list[0] == "risk_factor":
+                self._risks.add(path_list[1])
+
+            self._str += str(item[0]) + "\n"
 
     def __str__(self):
-        if not self._str:
-            msg = "HDF: " + self._path + "\n"
-            msg += "---Table Map---\n"
-            for item in self._hdf.items():
-                msg += str(item[0]) + "\n"
-            self._str = msg
         return self._str
 
     @lru_cache(maxsize=32)
@@ -77,7 +92,8 @@ class ArtifactTool():
 
         table = self._reduce_draws(table)
         table = self._add_population(table)
-        table['exposed'] = table.average * table.population
+        print(table.columns)
+        table['exposed'] = table.value_mean * table.population
 
         exposure_table = table.groupby(['parameter']).aggregate(np.sum)
         exposure_table['percent'] = exposure_table.exposed / exposure_table.population
