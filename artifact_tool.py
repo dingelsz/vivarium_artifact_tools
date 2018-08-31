@@ -34,6 +34,14 @@ class ArtifactTool():
 
             self._str += str(item[0]) + "\n"
 
+    @property
+    def risks(self):
+        return self._risks
+
+    @property
+    def causes(self):
+        return self._causes
+
     def __str__(self):
         return self._str
 
@@ -84,7 +92,7 @@ class ArtifactTool():
 
     @lru_cache(maxsize=32)
     def get_exposure_rates_by_year_and_age(self, risk_factor, year=2016, lower=0, upper=5):
-        # TODO check that the risk_factor is valid
+        assert risk_factor in self._risks, "risk_factor is not in the Artifact"
         table = self._hdf.get('/risk_factor/' + risk_factor + '/exposure')
         table = table[table.year == year]
         table = table[table.age <= upper]
@@ -101,6 +109,7 @@ class ArtifactTool():
 
     @lru_cache(maxsize=32)
     def get_relative_risk_by_year_and_age(self, risk_factor, year=2016, lower=0, upper=5):
+        assert risk_factor in self._risks, "risk_factor is not in the Artifact"
         table = self._hdf.get('/risk_factor/' + risk_factor + '/relative_risk')
         table = table[table.year == year]
         table = table[table.age <= upper]
