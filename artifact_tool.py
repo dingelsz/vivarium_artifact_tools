@@ -14,8 +14,10 @@ class ArtifactTool():
         self._parse_paths()
 
     def _parse_paths(self):
-        # Create sets of causes and risks and create a message
-        # to be called when the user prints the AT
+        """ Parse the paths of each leaf in the HDF file. Pull out all causes
+        and risks. Also create a string that gives the path and structure of
+        the hdf that the user gets when they print the AT.
+        """
         self._causes = set()
         self._risks = set()
 
@@ -45,13 +47,11 @@ class ArtifactTool():
     def __str__(self):
         return self._str
 
-    @lru_cache(maxsize=32)
-    def get_population_for_year(self, year=2016):
-        table = self._hdf.get('/population/structure')
-        return table[table.year == year].population.sum() / 2
+    def __del__(self):
+        self._hdf.close()
 
     @lru_cache(maxsize=32)
-    def get_population_for_year_and_age(self, year=2016, lower=0, upper=5):
+    def population_for_year_with_age_limit(self, year: int=2016, lower: float=0, upper: float=5):
         table = self._hdf.get('/population/structure')
         table = table[table.year == year]
         table = table[table.age <= upper]
@@ -59,13 +59,11 @@ class ArtifactTool():
         return table.population.sum() / 2
 
     @lru_cache(maxsize=32)
-    def get_deaths_for_year(self, year=2016):
-        table = self._hdf.get('/cause/all_causes/death')
-        table = table[table.year == year]
-        return table.value.sum() / 1000 / 2
+    def population_for_year(self, year: int=2016):
+        return self.population_for_year_with_age_limit(year, 0, 1000)
 
     @lru_cache(maxsize=32)
-    def get_deaths_for_year_and_age(self, year=2016, lower=0, upper=5):
+    def deaths_for_year_with_age_limit(self, year: int=2016, lower: float=0, upper: float=5):
         table = self._hdf.get('/cause/all_causes/death')
         table = table[table.year == year]
         table = table[table.age <= upper]
@@ -73,25 +71,29 @@ class ArtifactTool():
         return table.value.sum() / 1000 / 2
 
     @lru_cache(maxsize=32)
-    def get_live_birth_rate(self, year=2016):
+    def deaths_for_year(self, year: int =2016):
+        return self.deaths_for_year_with_age_limit(year, 0, 1000)
+
+    @lru_cache(maxsize=32)
+    def live_births_for_year(self, year: int=2016):
         table = self._hdf.get('/covariate/live_births_by_sex/estimate')
         table = table[table.year == year]
         return table.mean_value.sum() / 2
 
     @lru_cache(maxsize=32)
-    def get_crude_birth_rate(self, year=2016):
-        live_birth_rate = self.get_live_birth_rate(year)
-        population_size = self.get_population_for_year(year)
+    def crude_birth_rate_for_year(self, year: int=2016):
+        live_birth_rate = self.live_births_for_year(year)
+        population_size = self.population_for_year(year)
         return live_birth_rate / population_size * 1000
 
     @lru_cache(maxsize=32)
-    def get_child_mortality_rate(self, year=2016):
-        deaths_under_5 = self.get_deaths_for_year_and_age(year, 0, 5)
-        live_birth_rate = self.get_live_birth_rate(year)
+    def child_mortality_rate_for_year(self, year: int =2016):
+        deaths_under_5 = self.deaths_for_year_with_age_limit(year, 0, 5)
+        live_birth_rate = self.live_births_for_year(year)
         return deaths_under_5 / live_birth_rate * 1000
 
     @lru_cache(maxsize=32)
-    def get_exposure_rates_by_year_and_age(self, risk_factor, year=2016, lower=0, upper=5):
+    def exposure_rates_by_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: int=0, upper: int=5):
         assert risk_factor in self._risks, "risk_factor is not in the Artifact"
         table = self._hdf.get('/risk_factor/' + risk_factor + '/exposure')
         table = table[table.year == year]
@@ -108,7 +110,7 @@ class ArtifactTool():
         return pd.DataFrame(exposure_table.percent.tolist(), columns=['rate'], index=exposure_table.index)
 
     @lru_cache(maxsize=32)
-    def get_relative_risk_by_year_and_age(self, risk_factor, year=2016, lower=0, upper=5):
+    def relative_risk_by_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: float=0, upper: float=5):
         assert risk_factor in self._risks, "risk_factor is not in the Artifact"
         table = self._hdf.get('/risk_factor/' + risk_factor + '/relative_risk')
         table = table[table.year == year]
@@ -116,7 +118,6 @@ class ArtifactTool():
         table = table[table.age >= lower]
 
         table = self._reduce_draws(table)
-        # TODO Remove population is we don't need it
         table = self._add_population(table)
         table = table.sort_values(by=['cause', 'parameter'])
 
@@ -134,7 +135,7 @@ class ArtifactTool():
         results['relative_risk'] = pd.Series(risks)
         return results
 
-    def _reduce_draws(self, table, val_col="value"):
+    def _reduce_draws(self, table: pd.DataFrame, val_col: str="value"):
         """Creates a DataFrame with mean and CI values obtained across draws.
 
         Parameters
@@ -181,7 +182,7 @@ class ArtifactTool():
 
         return result_df
 
-    def _add_population(self, table):
+    def _add_population(self, table: pd.DataFrame):
         """ Maps data on age, sex and year to populations.
 
         Parameters
