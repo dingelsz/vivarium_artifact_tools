@@ -2,7 +2,7 @@ from artifact_tool import *
 
 # List of methods in the AT
 #[func for func in dir(at) if func[0:2] != "__"]
-
+#%run artifact_tool.py
 at = ArtifactTool('/Users/Zach/Projects/IHME/bfp_nigeria.hdf')
 
 def test_population_by_year():
@@ -30,8 +30,11 @@ def test_get_child_mortality_rate():
     pass
 
 def test_expsoure_rates_by_year_and_age():
-    assert at.get_exposure_rates_by_year_and_age('child_stunting', 2016, 0, 5).rate.sum() == 1
+    for risk in at._risks:
+        assert at.get_exposure_rates_by_year_and_age(risk, 2016, 0, 5).rate.sum() - 1 < 1e-5
 
 def test_get_relative_risk_by_year_and_age():
-    rr_table = at.get_relative_risk_by_year_and_age('child_stunting', 2016, 0, 5)
-    assert all(rr_table[rr_table.parameter == 'cat4'].relative_risk == 1)
+    for risk in at._risks:
+        rr_table = at.get_relative_risk_by_year_and_age(risk, 2016, 0, 5)
+        max_parameter = max(rr_table.parameter.unique())
+        assert all(rr_table[rr_table.parameter == max_parameter].relative_risk - 1 < 1e-5)
