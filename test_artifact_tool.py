@@ -1,4 +1,5 @@
 from artifact_tool import *
+from time import time
 
 # List of methods in the AT
 #[func for func in dir(at) if func[0:2] != "__"]
@@ -38,3 +39,10 @@ def test_relative_risk_by_year_with_age_limit():
         rr_table = at.relative_risk_by_year_with_age_limit(risk, 2016, 0, 5)
         max_parameter = max(rr_table.parameter.unique())
         assert all(rr_table[rr_table.parameter == max_parameter].relative_risk - 1 < 1e-5)
+
+def test_summary_exposure_value_for_year_with_age_limit():
+    start_time = time()
+    for risk in at._risks:
+        SEV = at.summary_exposure_value_for_year_with_age_limit(risk, 2016, 0, 5)
+        assert all(SEV.SEV >= 0) and all(SEV.SEV <= 1)
+    assert time() - start_time < 5

@@ -94,6 +94,7 @@ class ArtifactTool():
 
     @lru_cache(maxsize=32)
     def exposure_rates_by_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: int=0, upper: int=5):
+        # TODO Add category names
         assert risk_factor in self._risks, "risk_factor is not in the Artifact"
         table = self._hdf.get('/risk_factor/' + risk_factor + '/exposure')
         table = table[table.year == year]
@@ -102,15 +103,19 @@ class ArtifactTool():
 
         table = self._reduce_draws(table)
         table = self._add_population(table)
-        print(table.columns)
         table['exposed'] = table.value_mean * table.population
 
         exposure_table = table.groupby(['parameter']).aggregate(np.sum)
         exposure_table['percent'] = exposure_table.exposed / exposure_table.population
-        return pd.DataFrame(exposure_table.percent.tolist(), columns=['rate'], index=exposure_table.index)
+        results = pd.DataFrame(exposure_table.percent.tolist(), columns=['rate'])
+        results['year'] = pd.Series([year] * len(results))
+        # TODO Map parameters to their names
+        results['parameter'] = exposure_table.index
+        return results
 
     @lru_cache(maxsize=32)
     def relative_risk_by_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: float=0, upper: float=5):
+        # TODO Add category names
         assert risk_factor in self._risks, "risk_factor is not in the Artifact"
         table = self._hdf.get('/risk_factor/' + risk_factor + '/relative_risk')
         table = table[table.year == year]
@@ -131,8 +136,28 @@ class ArtifactTool():
             risks.append(risk_for_group)
 
         results = pd.DataFrame(list(groups.keys()), columns=['causes', 'parameter'])
-        results['risk'] = pd.Series([risk_factor for _ in range(len(results))])
+        results['risk'] = pd.Series([risk_factor] * len(results))
+        results['year'] = pd.Series([year] * len(results))
         results['relative_risk'] = pd.Series(risks)
+        return results
+
+    @lru_cache(maxsize=32)
+    def summary_exposure_value_for_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: float=0, upper: float=5):
+        exposure_table = self.exposure_rates_by_year_with_age_limit(risk_factor, year, lower, upper)
+        rr_table = self.relative_risk_by_year_with_age_limit(risk_factor, year, lower, upper)
+        table = rr_table.sort_values(by=['causes', 'parameter'])
+        table['exposure'] = exposure_table.rate.tolist() * len(rr_table.causes.unique())
+        numerator = table.relative_risk * table.exposure
+
+        groups = table.groupby(['causes']).groups
+        numerator = [numerator[groups[cause]].sum() - 1 for cause in groups]
+        denominator = [table.relative_risk[groups[cause]].max() - 1 for cause in groups]
+
+        results = pd.DataFrame(list(groups.keys()), columns = ['causes'])
+        results['risk'] = [risk_factor] * len(results)
+        results['year'] = [year] * len(results)
+        results['SEV'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
+
         return results
 
     def _reduce_draws(self, table: pd.DataFrame, val_col: str="value"):
@@ -183,6 +208,7 @@ class ArtifactTool():
         return result_df
 
     def _add_population(self, table: pd.DataFrame):
+        # TODO add years column
         """ Maps data on age, sex and year to populations.
 
         Parameters
