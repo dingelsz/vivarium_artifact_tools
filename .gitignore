@@ -1,3 +1,4 @@
 *.py~
 _*.py
 .pytest_cache
+/__pycache__/
