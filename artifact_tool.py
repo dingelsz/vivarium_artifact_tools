@@ -105,10 +105,13 @@ class ArtifactTool():
         numerator = [exposed[groups[risk]].sum() for risk in groups]
         denominator = [table.population[groups[risk]].sum() for risk in groups]
 
-        n_rows = len(exposure_table)
-        results = self._default_result_table(year, n_rows)
+        cat_map = {cat: ceam_inputs.risk_factors[risk_factor].levels[cat] for cat in table.parameter.unique()}
+
+        n_rows = len(groups)
+        results = at._default_result_table(year, n_rows)
         results['risk'] = [risk_factor] * n_rows
         results['parameter'] = list(groups.keys())
+        results.parameter = results.parameter.apply(cat_map)
         results['exposure_rate'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
         return results
 
@@ -126,11 +129,14 @@ class ArtifactTool():
         numerator = [weighted_risk[groups[risk]].sum() for risk in groups]
         denominator = [table.population[groups[risk]].sum() for risk in groups]
 
+
+        cat_map = {cat: ceam_inputs.risk_factors[risk_factor].levels[cat] for cat in table.parameter.unique()}
+
         n_rows = len(groups)
         results = self._default_result_table(year, n_rows)
         causes, parameters = zip(*list(groups.keys()))
         results['risk'] = [risk_factor] * n_rows
-        results['parameter'] = parameters
+        results['parameter'] = parameters.apply(cat_map)
         results['cause'] = causes
         results['relative_risk'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
         return results
@@ -198,7 +204,6 @@ class ArtifactTool():
         results['CSMR'] = [(table.value_mean * table.population).sum() / table.population.sum()]
         return results
 
-    
     def incidence_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
 
@@ -338,3 +343,6 @@ class ArtifactTool():
         results['location'] = [self._location] * n_rows
         results['sex'] = ["Both"] * n_rows
         return results
+
+    def _map_series(series):
+        {cat: ceam_inputs.risk_factors['child_stunting'].levels['cat1']}
