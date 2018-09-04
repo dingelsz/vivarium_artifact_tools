@@ -135,7 +135,6 @@ class ArtifactTool():
         results['relative_risk'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
         return results
 
-    @lru_cache(maxsize=32)
     def SEV_for_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: float=0, upper: float=5):
         # GBD Uses strict age bins for calculating DBF and NEBF
         if risk_factor == "discontinued_breastfeeding":
@@ -163,7 +162,6 @@ class ArtifactTool():
         results['SEV'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
         return results
 
-    @lru_cache(maxsize=32)
     def PAF_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
         assert cause != 'all_causes', "all_causes does not have a PAF"
@@ -185,7 +183,7 @@ class ArtifactTool():
         results['PAF'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
         return results
 
-    @lru_cache(maxsize=32)
+
     def CSMR_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
 
@@ -200,7 +198,7 @@ class ArtifactTool():
         results['CSMR'] = [(table.value_mean * table.population).sum() / table.population.sum()]
         return results
 
-    @lru_cache(maxsize=32)
+    
     def incidence_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
 
