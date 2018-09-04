@@ -95,9 +95,9 @@ class ArtifactTool():
     def exposure_rates_by_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: int=0, upper: int=5):
         assert risk_factor in self._risks, "risk_factor is not in the Artifact"
 
-        table = at._get_table_for_year_with_age_limit('/risk_factor/' + risk_factor + '/exposure', year, lower, upper)
-        table = at._reduce_draws(table)
-        table = at._add_population(table)
+        table = self._get_table_for_year_with_age_limit('/risk_factor/' + risk_factor + '/exposure', year, lower, upper)
+        table = self._reduce_draws(table)
+        table = self._add_population(table)
 
         exposed = table.value_mean * table.population
 
@@ -108,7 +108,7 @@ class ArtifactTool():
         cat_map = {cat: ceam_inputs.risk_factors[risk_factor].levels[cat] for cat in table.parameter.unique()}
 
         n_rows = len(groups)
-        results = at._default_result_table(year, n_rows)
+        results = self._default_result_table(year, n_rows)
         results['risk'] = [risk_factor] * n_rows
         results['parameter'] = list(groups.keys())
         results.parameter = results.parameter.apply(cat_map)
@@ -119,9 +119,9 @@ class ArtifactTool():
     def relative_risk_by_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: float=0, upper: float=5):
         assert risk_factor in self._risks, "risk_factor is not in the Artifact"
 
-        table = at._get_table_for_year_with_age_limit('/risk_factor/' + risk_factor + '/relative_risk', year, lower, upper)
-        table = at._reduce_draws(table)
-        table = at._add_population(table)
+        table = self._get_table_for_year_with_age_limit('/risk_factor/' + risk_factor + '/relative_risk', year, lower, upper)
+        table = self._reduce_draws(table)
+        table = self._add_population(table)
 
         weighted_risk = table.population * table.value_mean
 
