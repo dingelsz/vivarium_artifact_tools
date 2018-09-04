@@ -143,7 +143,14 @@ class ArtifactTool():
         return results
 
     @lru_cache(maxsize=32)
-    def summary_exposure_value_for_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: float=0, upper: float=5):
+    def SEV_for_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: float=0, upper: float=5):
+        # GBD Uses strict age bins for calculating DBF and NEBF
+        if risk_factor == "discontinued_breastfeeding":
+            lower = 0.5
+            upper = 3
+        if risk_factor == "non_exclusive_breastfeeding":
+            lower = 0.04
+            upper = 1
         exposure_table = self.exposure_rates_by_year_with_age_limit(risk_factor, year, lower, upper)
         rr_table = self.relative_risk_by_year_with_age_limit(risk_factor, year, lower, upper)
         table = rr_table.sort_values(by=['causes', 'parameter'])
@@ -162,7 +169,7 @@ class ArtifactTool():
         return results
 
     @lru_cache(maxsize=32)
-    def summary_PAF_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
+    def PAF_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
         table = self._hdf.get('/cause/' + cause + '/population_attributable_fraction')
         table = table[table.year == year]
@@ -186,7 +193,7 @@ class ArtifactTool():
         return results
 
     @lru_cache(maxsize=32)
-    def summary_CSMR_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
+    def CSMR_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
         table = self._hdf.get('/cause/' + cause + '/cause_specific_mortality')
         table = table[table.year == year]
@@ -202,15 +209,15 @@ class ArtifactTool():
         return results
 
     @lru_cache(maxsize=32)
-    def summary_incidence_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
+    def incidence_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
-        table = at._hdf.get('/cause/' + cause + '/incidence')
+        table = self._hdf.get('/cause/' + cause + '/incidence')
         table = table[table.year == year]
         table = table[table.age <= upper]
         table = table[table.age >= lower]
         table = table[table.sex == "Both"]
-        table = at._reduce_draws(table)
-        table = at._add_population(table)
+        table = self._reduce_draws(table)
+        table = self._add_population(table)
 
         results = pd.DataFrame([cause], columns = ['cause'])
         results['year'] = [year]
