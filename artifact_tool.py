@@ -5,7 +5,6 @@ from functools import lru_cache
 
 
 class ArtifactTool():
-    # TODO Standardize outputs of all functions
     # TODO Map parameters to their names ceam_inputs.risk_factors.child_stunting
     # TODO Write a query parser that checks if query is valid for table
 
@@ -27,7 +26,10 @@ class ArtifactTool():
         self._str = "HDF: " + self._path + "\n"
         self._str += "---Table Map---\n"
 
+        self._table_paths = []
+
         for item in self._hdf.items():
+            self._table_paths.append(item[0])
             path_list = item[0].split('/')
             path_list = path_list[1:]
 
@@ -55,10 +57,7 @@ class ArtifactTool():
 
     @lru_cache(maxsize=32)
     def population_for_year_with_age_limit(self, year: int=2016, lower: float=0, upper: float=5):
-        table = self._hdf.get('/population/structure')
-        table = table[table.year == year]
-        table = table[table.age <= upper]
-        table = table[table.age >= lower]
+        table = self._get_table_for_year_with_age_limit('/population/structure', year, lower, upper)
         return table.population.sum() / 2
 
     @lru_cache(maxsize=32)
@@ -67,10 +66,7 @@ class ArtifactTool():
 
     @lru_cache(maxsize=32)
     def deaths_for_year_with_age_limit(self, year: int=2016, lower: float=0, upper: float=5):
-        table = self._hdf.get('/cause/all_causes/death')
-        table = table[table.year == year]
-        table = table[table.age <= upper]
-        table = table[table.age >= lower]
+        table = self._get_table_for_year_with_age_limit('/cause/all_causes/death', year, lower, upper)
         return table.value.sum() / 1000 / 2
 
     @lru_cache(maxsize=32)
@@ -99,10 +95,7 @@ class ArtifactTool():
     def exposure_rates_by_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: int=0, upper: int=5):
         assert risk_factor in self._risks, "risk_factor is not in the Artifact"
 
-        table = self._hdf.get('/risk_factor/' + risk_factor + '/exposure')
-        table = table[table.year == year]
-        table = table[table.age <= upper]
-        table = table[table.age >= lower]
+        table = self._get_table_for_year_with_age_limit('/risk_factor/' + risk_factor + '/exposure', year, lower, upper)
 
         table = self._reduce_draws(table)
         table = self._add_population(table)
@@ -112,9 +105,7 @@ class ArtifactTool():
         exposure_table['percent'] = exposure_table.exposed / exposure_table.population
 
         n_rows = len(exposure_table)
-        results = pd.DataFrame([year] * n_rows, columns=['year'])
-        results['location'] = [self._location] * n_rows
-        results['sex'] = ["Both"] * n_rows
+        results = self._default_result_table(year, n_rows)
         results['risk'] = [risk_factor] * n_rows
         results['parameter'] = exposure_table.index
         results['exposure_rate'] = exposure_table.percent.tolist()
@@ -123,10 +114,7 @@ class ArtifactTool():
     @lru_cache(maxsize=32)
     def relative_risk_by_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: float=0, upper: float=5):
         assert risk_factor in self._risks, "risk_factor is not in the Artifact"
-        table = self._hdf.get('/risk_factor/' + risk_factor + '/relative_risk')
-        table = table[table.year == year]
-        table = table[table.age <= upper]
-        table = table[table.age >= lower]
+        table = self._get_table_for_year_with_age_limit('/risk_factor/' + risk_factor + '/relative_risk', year, lower, upper)
 
         table = self._reduce_draws(table)
         table = self._add_population(table)
@@ -142,9 +130,7 @@ class ArtifactTool():
             risks.append(risk_for_group)
 
         n_rows = len(groups)
-        results = pd.DataFrame([year] * n_rows, columns=['year'])
-        results['location'] = [self._location] * n_rows
-        results['sex'] = ["Both"] * n_rows
+        results = self._default_result_table(year, n_rows)
         causes, parameters = zip(*list(groups.keys()))
         results['risk'] = [risk_factor] * n_rows
         results['parameter'] = parameters
@@ -172,9 +158,7 @@ class ArtifactTool():
         denominator = [table.relative_risk[groups[cause]].max() - 1 for cause in groups]
 
         n_rows = len(groups)
-        results = pd.DataFrame([year] * n_rows, columns=['year'])
-        results['location'] = [self._location] * n_rows
-        results['sex'] = ["Both"] * n_rows
+        results = self._default_result_table(year, n_rows)
         results['risk'] = [risk_factor] * n_rows
         results['cause'] = list(groups.keys())
         results['SEV'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
@@ -184,10 +168,7 @@ class ArtifactTool():
     def PAF_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
         assert cause != 'all_causes', "all_causes does not have a PAF"
-        table = self._hdf.get('/cause/' + cause + '/population_attributable_fraction')
-        table = table[table.year == year]
-        table = table[table.age <= upper]
-        table = table[table.age >= lower]
+        table = self._get_table_for_year_with_age_limit('/cause/' + cause + '/population_attributable_fraction', year, lower, upper)
         table = self._reduce_draws(table)
         table = self._add_population(table)
         table = table.sort_values(by=["risk", "sex"])
@@ -200,9 +181,7 @@ class ArtifactTool():
         denominator = [table.population[groups[risk]].sum() for risk in groups]
 
         n_rows = len(groups)
-        results = pd.DataFrame([year] * n_rows, columns=['year'])
-        results['location'] = [self._location] * n_rows
-        results['sex'] = ["Both"] * n_rows
+        results = self._default_result_table(year, n_rows)
         results['cause'] = [cause] * n_rows
         results['risk'] = list(groups.keys())
         results['PAF'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
@@ -211,18 +190,13 @@ class ArtifactTool():
     @lru_cache(maxsize=32)
     def CSMR_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
-        table = at._hdf.get('/cause/' + cause + '/cause_specific_mortality')
-        table = table[table.year == year]
-        table = table[table.age <= upper]
-        table = table[table.age >= lower]
+        table = self._get_table_for_year_with_age_limit('/cause/' + cause + '/cause_specific_mortality', year, lower, upper)
         table = table[table.sex == "Both"]
         table = self._reduce_draws(table)
         table = self._add_population(table)
 
         n_rows = 1
-        results = pd.DataFrame([year] * n_rows, columns=['year'])
-        results['location'] = [self._location] * n_rows
-        results['sex'] = ["Both"] * n_rows
+        results = self._default_result_table(year, n_rows)
         results['cause'] = [cause] * n_rows
         results['CSMR'] = [(table.value_mean * table.population).sum() / table.population.sum()]
         return results
@@ -230,19 +204,13 @@ class ArtifactTool():
     @lru_cache(maxsize=32)
     def incidence_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
-        table = self._hdf.get('/cause/' + cause + '/incidence')
-        table = table[table.year == year]
-        table = table[table.age <= upper]
-        table = table[table.age >= lower]
+        table = self._get_table_for_year_with_age_limit('/cause/' + cause + '/incidence', year, lower, upper)
         table = table[table.sex == "Both"]
         table = self._reduce_draws(table)
         table = self._add_population(table)
 
-
         n_rows = 1
-        results = pd.DataFrame([year] * n_rows, columns=['year'])
-        results['location'] = [self._location] * n_rows
-        results['sex'] = ["Both"] * n_rows
+        results = self._default_result_table(year, n_rows)
         results['cause'] = [cause] * n_rows
         results['incidence'] = [(table.value_mean * table.population).sum() / table.population.sum()]
         return results
@@ -326,3 +294,47 @@ class ArtifactTool():
 
         pop_table = pop_table.drop(columns=['hash'])
         return table
+
+    def _get_table_for_year_with_age_limit(self, path, year, lower, upper):
+        """
+
+        Parameters
+        ----------
+        path:
+            A valid path in self._hdf.
+        year:
+            An integer representing the year of the results
+        lower:
+            A lower bound on age
+        upper: An upper bound on age
+
+        Returns
+        -------
+        A default results table.
+        """
+        assert path in self._table_paths, "The table: " + str(path) + " does not exist in the hdf: " + str(self._path)
+        table = self._hdf.get(path)
+        table = table[table.year == year]
+        table = table[table.age <= upper]
+        table = table[table.age >= lower]
+        return table
+
+    def _default_result_table(self, year, n_rows):
+        """ Returns a default results table used to format results.
+
+        Parameters
+        ----------
+        year:
+            An integer representing the year of the results
+        n_rows:
+            A non-negative integer representing the number of rows for the results
+
+        Returns
+        -------
+        A default results table.
+        """
+        assert n_rows >= 0
+        results = pd.DataFrame([year] * n_rows, columns=['year'])
+        results['location'] = [self._location] * n_rows
+        results['sex'] = ["Both"] * n_rows
+        return results
