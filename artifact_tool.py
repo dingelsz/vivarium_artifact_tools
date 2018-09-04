@@ -3,6 +3,7 @@ import numpy as np
 
 from functools import lru_cache
 
+import ceam_inputs
 
 class ArtifactTool():
     # TODO Map parameters to their names ceam_inputs.risk_factors.child_stunting
@@ -110,8 +111,7 @@ class ArtifactTool():
         n_rows = len(groups)
         results = self._default_result_table(year, n_rows)
         results['risk'] = [risk_factor] * n_rows
-        results['parameter'] = list(groups.keys())
-        results.parameter = results.parameter.apply(cat_map)
+        results['parameter'] = pd.Series(list(groups.keys())).map(cat_map)
         results['exposure_rate'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
         return results
 
@@ -136,7 +136,7 @@ class ArtifactTool():
         results = self._default_result_table(year, n_rows)
         causes, parameters = zip(*list(groups.keys()))
         results['risk'] = [risk_factor] * n_rows
-        results['parameter'] = parameters.apply(cat_map)
+        results['parameter'] = pd.Series(parameters).map(cat_map)
         results['cause'] = causes
         results['relative_risk'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
         return results

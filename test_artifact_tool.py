@@ -4,7 +4,8 @@ from time import time
 # List of methods in the AT
 #[func for func in dir(at) if func[0:2] != "__"]
 #%run artifact_tool.py
-at = ArtifactTool('/Users/Zach/Projects/IHME/bfp_nigeria.hdf')
+#at = ArtifactTool('/Users/Zach/Projects/IHME/bfp_nigeria.hdf')
+at = ArtifactTool('/share/scratch/users/abie/bfp_nigeria.hdf')
 
 def test_population_for_year():
     assert at.population_for_year(2016) == at._hdf.get('/population/structure').query('year == 2016 and sex == "Both"').population.sum()
@@ -37,7 +38,7 @@ def test_exposure_rates_by_year_with_age_limit():
 def test_relative_risk_by_year_with_age_limit():
     for risk in at._risks:
         rr_table = at.relative_risk_by_year_with_age_limit(risk, 2016, 0.04, 1)
-        max_parameter = max(rr_table.parameter.unique())
+        max_parameter = 'unexposed'
         assert all(rr_table[rr_table.parameter == max_parameter].relative_risk - 1 < 1e-5)
 
 def test_SEV_for_year_with_age_limit():
