@@ -6,6 +6,7 @@ from functools import lru_cache
 
 class ArtifactTool():
     # TODO Write a query parser that checks if query is valid for table
+    # TODO Standardize outputs of all functions
 
     def __init__(self, path):
         self._path = path
@@ -115,7 +116,7 @@ class ArtifactTool():
 
     @lru_cache(maxsize=32)
     def relative_risk_by_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: float=0, upper: float=5):
-        # TODO Add category names
+        # TODO Add category names ceam_inputs.risk_factors.child_stunting
         assert risk_factor in self._risks, "risk_factor is not in the Artifact"
         table = self._hdf.get('/risk_factor/' + risk_factor + '/relative_risk')
         table = table[table.year == year]
@@ -159,6 +160,65 @@ class ArtifactTool():
         results['SEV'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
 
         return results
+
+    @lru_cache(maxsize=32)
+    def summary_PAF_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
+        assert cause in self._causes, "cause is not in the Artifact"
+        table = self._hdf.get('/cause/' + cause + '/population_attributable_fraction')
+        table = table[table.year == year]
+        table = table[table.age <= upper]
+        table = table[table.age >= lower]
+        table = self._reduce_draws(table)
+        table = self._add_population(table)
+        table = table.sort_values(by=["risk", "sex"])
+
+        weighted_paf = table.value_mean * table.population
+
+        groups = table.groupby(by=["risk"]).groups
+
+        numerator = [weighted_paf[groups[risk]].sum() for risk in groups]
+        denominator = [table.population[groups[risk]].sum() for risk in groups]
+
+        results = pd.DataFrame(list(groups.keys()), columns = ['risk'])
+        results['cause'] = [cause] * len(results)
+        results['year'] = [year] * len(results)
+        results['PAF'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
+        return results
+
+    @lru_cache(maxsize=32)
+    def summary_CSMR_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
+        assert cause in self._causes, "cause is not in the Artifact"
+        table = self._hdf.get('/cause/' + cause + '/cause_specific_mortality')
+        table = table[table.year == year]
+        table = table[table.age <= upper]
+        table = table[table.age >= lower]
+        table = table[table.sex == "Both"]
+        table = self._reduce_draws(table)
+        table = self._add_population(table)
+
+        results = pd.DataFrame([cause], columns = ['cause'])
+        results['year'] = [year]
+        results['CSMR'] = (table.value_mean * table.population).sum() / table.population.sum()
+        return results
+
+    @lru_cache(maxsize=32)
+    def summary_incidence_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
+        assert cause in self._causes, "cause is not in the Artifact"
+        table = at._hdf.get('/cause/' + cause + '/incidence')
+        table = table[table.year == year]
+        table = table[table.age <= upper]
+        table = table[table.age >= lower]
+        table = table[table.sex == "Both"]
+        table = at._reduce_draws(table)
+        table = at._add_population(table)
+
+        results = pd.DataFrame([cause], columns = ['cause'])
+        results['year'] = [year]
+        results['incidence'] = (table.value_mean * table.population).sum() / table.population.sum()
+        return results
+
+    # Incidence Rate
+
 
     def _reduce_draws(self, table: pd.DataFrame, val_col: str="value"):
         """Creates a DataFrame with mean and CI values obtained across draws.
