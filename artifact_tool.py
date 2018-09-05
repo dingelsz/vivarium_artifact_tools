@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from functools import lru_cache
+from functools import lru_cache, partial
 from types import SimpleNamespace
 
 import ceam_inputs
@@ -17,10 +17,10 @@ class HDF_Path_Parser():
         nodes = path.split("/")[1:]
         level = self.root
         while len(nodes) > 0:
-            cur_node = nodes.pop(0)
-            if not cur_node in level:
-                level[cur_node] = {}
-            level = level[cur_node]
+            current_node = nodes.pop(0)
+            if current_node not in level:
+                level[current_node] = {}
+            level = level[current_node]
         level['path'] = path
 
     def to_namespace(self):
@@ -28,7 +28,8 @@ class HDF_Path_Parser():
 
     def _dict_to_namespace(self, root):
         for key in root:
-            if key == 'path': continue
+            if key == 'path':
+                continue
             root[key] = self._dict_to_namespace(root[key])
         return SimpleNamespace(**root)
 
@@ -79,11 +80,11 @@ class ArtifactTool():
 
     def _create_covariates(self):
         covars = covariates.to_dict()
-        covars = {c: covars[c]['gbd_id'] for c in covars}
+        covars = {c: partial(self._get_covariate, covars[c]['gbd_id']) for c in covars}
         return SimpleNamespace(**covars)
 
-    def get_covariate(self, covars):
-        return gbd.get_covariate_estimates([covars], self._gbd_location_id)
+    def _get_covariate(self, covariate_ids):
+        return gbd.get_covariate_estimates([covariate_ids], self._gbd_location_id)
 
     @property
     def risks(self):
@@ -149,7 +150,7 @@ class ArtifactTool():
 
         table = self._get_table_for_year_with_age_limit('/risk_factor/' + risk_factor + '/exposure', year, lower, upper)
         table = self.reduce_draws(table)
-        table = self.add_population(table)
+        table = self.append_population(table)
 
         exposed = table.value_mean * table.population
 
@@ -172,7 +173,7 @@ class ArtifactTool():
 
         table = self._get_table_for_year_with_age_limit('/risk_factor/' + risk_factor + '/relative_risk', year, lower, upper)
         table = self.reduce_draws(table)
-        table = self.add_population(table)
+        table = self.append_population(table)
 
         weighted_risk = table.population * table.value_mean
 
@@ -224,7 +225,7 @@ class ArtifactTool():
 
         table = self._get_table_for_year_with_age_limit('/cause/' + cause + '/population_attributable_fraction', year, lower, upper)
         table = self.reduce_draws(table)
-        table = self.add_population(table)
+        table = self.append_population(table)
 
         weighted_paf = table.value_mean * table.population
 
@@ -245,7 +246,7 @@ class ArtifactTool():
         table = self._get_table_for_year_with_age_limit('/cause/' + cause + '/cause_specific_mortality', year, lower, upper)
         table = table[table.sex == "Both"]
         table = self.reduce_draws(table)
-        table = self.add_population(table)
+        table = self.append_population(table)
 
         n_rows = 1
         results = self._default_result_table(year, n_rows)
@@ -259,7 +260,7 @@ class ArtifactTool():
         table = self._get_table_for_year_with_age_limit('/cause/' + cause + '/incidence', year, lower, upper)
         table = table[table.sex == "Both"]
         table = self.reduce_draws(table)
-        table = self.add_population(table)
+        table = self.append_population(table)
 
         n_rows = 1
         results = self._default_result_table(year, n_rows)
@@ -313,8 +314,9 @@ class ArtifactTool():
 
         return result_df
 
-    def add_population(self, table: pd.DataFrame):
-        """ Maps data on age, sex and year to populations.
+    def append_population(self, table: pd.DataFrame):
+        """ Appends a new column with population data based on a rows Maps data
+            on age, sex and year.
 
         Parameters
         ----------
