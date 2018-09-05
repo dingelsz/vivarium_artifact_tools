@@ -77,7 +77,7 @@ class ArtifactTool():
 
             self._str += str(path) + "\n"
 
-        self.paths = path_parser.to_namespace(self._get_table)
+        self.tables = path_parser.to_namespace(self._get_table)
 
     def _create_covariates(self):
         covars = covariates.to_dict()
