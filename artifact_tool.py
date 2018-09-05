@@ -9,32 +9,33 @@ from gbd_mapping import covariates
 from vivarium_gbd_access import gbd
 
 
-class HDF_Path_Parser():
-    def __init__(self):
-        self.root = {}
-
-    def add(self, path):
-        nodes = path.split("/")[1:]
-        level = self.root
-        while len(nodes) > 0:
-            current_node = nodes.pop(0)
-            if current_node not in level:
-                level[current_node] = {}
-            level = level[current_node]
-        level['path'] = path
-
-    def to_namespace(self):
-        return self._dict_to_namespace(self.root)
-
-    def _dict_to_namespace(self, root):
-        for key in root:
-            if key == 'path':
-                continue
-            root[key] = self._dict_to_namespace(root[key])
-        return SimpleNamespace(**root)
-
-
 class ArtifactTool():
+
+    class _HDF_Path_Parser():
+        def __init__(self):
+            self.root = {}
+
+        def add(self, path):
+            nodes = path.split("/")[1:]
+            level = self.root
+            while len(nodes) > 0:
+                current_node = nodes.pop(0)
+                if current_node not in level:
+                    level[current_node] = {}
+                level = level[current_node]
+            level['table'] = path
+
+        def to_namespace(self, func):
+            return self._dict_to_namespace(self.root, func)
+
+        def _dict_to_namespace(self, root, func):
+            for key in root:
+                if key == 'table':
+                    continue
+                root[key] = self._dict_to_namespace(root[key], func)
+            if 'table' in root:
+                root['table'] = partial(func, root['table'])
+            return SimpleNamespace(**root)
 
     def __init__(self, path):
         self._path = path
@@ -59,7 +60,7 @@ class ArtifactTool():
 
         self._table_paths = []
 
-        path_parser = HDF_Path_Parser()
+        path_parser = self._HDF_Path_Parser()
 
         for path, _ in self._hdf.items():
             path_parser.add(path)
@@ -76,7 +77,7 @@ class ArtifactTool():
 
             self._str += str(path) + "\n"
 
-        self.paths = path_parser.to_namespace()
+        self.paths = path_parser.to_namespace(self._get_table)
 
     def _create_covariates(self):
         covars = covariates.to_dict()
@@ -85,6 +86,9 @@ class ArtifactTool():
 
     def _get_covariate(self, covariate_ids):
         return gbd.get_covariate_estimates([covariate_ids], self._gbd_location_id)
+
+    def _get_table(self, path):
+        return self._hdf.get(path)
 
     @property
     def risks(self):
@@ -103,10 +107,6 @@ class ArtifactTool():
 
     def __del__(self):
         self._hdf.close()
-
-    def get(self, path):
-        assert path in self._table_paths, "Path: " + path + " is invalid for HDF: " + self._path
-        return self._hdf.get(path)
 
     @lru_cache(maxsize=32)
     def population_for_year_with_age_limit(self, year: int=2016, lower: float=0, upper: float=5):
