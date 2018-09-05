@@ -77,6 +77,9 @@ class ArtifactTool():
 
             self._str += str(path) + "\n"
 
+        self.risks = SimpleNamespace(**{risk: risk for risk in self._risks})
+        self.causes = SimpleNamespace(**{cause: cause for cause in self._causes})
+
         self.tables = path_parser.to_namespace(self._get_table)
 
     def _create_covariates(self):
@@ -89,14 +92,6 @@ class ArtifactTool():
 
     def _get_table(self, path):
         return self._hdf.get(path)
-
-    @property
-    def risks(self):
-        return self._risks
-
-    @property
-    def causes(self):
-        return self._causes
 
     @property
     def location(self):
@@ -218,6 +213,13 @@ class ArtifactTool():
         results['cause'] = list(groups.keys())
         results['SEV'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
         return results
+
+    def SEV_all_risk_factors_for_year_with_age_limit(self, year: int=2016, lower: float=0, upper: float=5):
+        tmp_risks = self._risks.copy()
+        table = self.SEV_for_year_with_age_limit(tmp_risks.pop(), year, lower, upper)
+        for risk_factor in tmp_risks:
+            table.append(self.SEV_for_year_with_age_limit(risk_factor, year, lower, upper))
+        return table
 
     def PAF_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
