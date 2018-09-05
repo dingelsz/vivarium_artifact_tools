@@ -9,6 +9,30 @@ from gbd_mapping import covariates
 from vivarium_gbd_access import gbd
 
 
+class HDF_Path_Parser():
+    def __init__(self):
+        self.root = {}
+
+    def add(self, path):
+        nodes = path.split("/")[1:]
+        level = self.root
+        while len(nodes) > 0:
+            cur_node = nodes.pop(0)
+            if not cur_node in level:
+                level[cur_node] = {}
+            level = level[cur_node]
+        level['path'] = path
+
+    def to_namespace(self):
+        return self._dict_to_namespace(self.root)
+
+    def _dict_to_namespace(self, root):
+        for key in root:
+            if key == 'path': continue
+            root[key] = self._dict_to_namespace(root[key])
+        return SimpleNamespace(**root)
+
+
 class ArtifactTool():
 
     def __init__(self, path):
@@ -33,9 +57,13 @@ class ArtifactTool():
 
         self._table_paths = []
 
-        for item in self._hdf.items():
-            self._table_paths.append(item[0])
-            path_list = item[0].split('/')
+        path_parser = HDF_Path_Parser()
+
+        for path, _ in self._hdf.items():
+            path_parser.add(path)
+            self._table_paths.append(path)
+
+            path_list = path.split('/')
             path_list = path_list[1:]
 
             # Collect risks and causes
@@ -44,7 +72,9 @@ class ArtifactTool():
             if path_list[0] == "risk_factor":
                 self._risks.add(path_list[1])
 
-            self._str += str(item[0]) + "\n"
+            self._str += str(path) + "\n"
+
+        self.paths = path_parser.to_namespace()
 
     def _create_covariates(self):
         covars = covariates.to_dict()
@@ -67,6 +97,10 @@ class ArtifactTool():
 
     def __del__(self):
         self._hdf.close()
+
+    def get(self, path):
+        assert path in self._table_paths, "Path: " + path + " is invalid for HDF: " + self._path
+        return self._hdf.get(path)
 
     @lru_cache(maxsize=32)
     def population_for_year_with_age_limit(self, year: int=2016, lower: float=0, upper: float=5):
@@ -109,8 +143,8 @@ class ArtifactTool():
         assert risk_factor in self._risks, "risk_factor is not in the Artifact"
 
         table = self._get_table_for_year_with_age_limit('/risk_factor/' + risk_factor + '/exposure', year, lower, upper)
-        table = self._reduce_draws(table)
-        table = self._add_population(table)
+        table = self.reduce_draws(table)
+        table = self.add_population(table)
 
         exposed = table.value_mean * table.population
 
@@ -132,8 +166,8 @@ class ArtifactTool():
         assert risk_factor in self._risks, "risk_factor is not in the Artifact"
 
         table = self._get_table_for_year_with_age_limit('/risk_factor/' + risk_factor + '/relative_risk', year, lower, upper)
-        table = self._reduce_draws(table)
-        table = self._add_population(table)
+        table = self.reduce_draws(table)
+        table = self.add_population(table)
 
         weighted_risk = table.population * table.value_mean
 
@@ -184,8 +218,8 @@ class ArtifactTool():
         assert cause != 'all_causes', "all_causes does not have a PAF"
 
         table = self._get_table_for_year_with_age_limit('/cause/' + cause + '/population_attributable_fraction', year, lower, upper)
-        table = self._reduce_draws(table)
-        table = self._add_population(table)
+        table = self.reduce_draws(table)
+        table = self.add_population(table)
 
         weighted_paf = table.value_mean * table.population
 
@@ -205,8 +239,8 @@ class ArtifactTool():
 
         table = self._get_table_for_year_with_age_limit('/cause/' + cause + '/cause_specific_mortality', year, lower, upper)
         table = table[table.sex == "Both"]
-        table = self._reduce_draws(table)
-        table = self._add_population(table)
+        table = self.reduce_draws(table)
+        table = self.add_population(table)
 
         n_rows = 1
         results = self._default_result_table(year, n_rows)
@@ -219,8 +253,8 @@ class ArtifactTool():
 
         table = self._get_table_for_year_with_age_limit('/cause/' + cause + '/incidence', year, lower, upper)
         table = table[table.sex == "Both"]
-        table = self._reduce_draws(table)
-        table = self._add_population(table)
+        table = self.reduce_draws(table)
+        table = self.add_population(table)
 
         n_rows = 1
         results = self._default_result_table(year, n_rows)
@@ -228,7 +262,7 @@ class ArtifactTool():
         results['incidence'] = [(table.value_mean * table.population).sum() / table.population.sum()]
         return results
 
-    def _reduce_draws(self, table: pd.DataFrame, val_col: str="value"):
+    def reduce_draws(self, table: pd.DataFrame, val_col: str="value"):
         """Creates a DataFrame with mean and CI values obtained across draws.
 
         Parameters
@@ -274,7 +308,7 @@ class ArtifactTool():
 
         return result_df
 
-    def _add_population(self, table: pd.DataFrame):
+    def add_population(self, table: pd.DataFrame):
         """ Maps data on age, sex and year to populations.
 
         Parameters
@@ -353,6 +387,3 @@ class ArtifactTool():
         results['location'] = [self._country] * n_rows
         results['sex'] = ["Both"] * n_rows
         return results
-
-    def _map_series(series):
-        {cat: ceam_inputs.risk_factors['child_stunting'].levels['cat1']}
