@@ -2,8 +2,11 @@ import pandas as pd
 import numpy as np
 
 from functools import lru_cache
+from types import SimpleNamespace
 
 import ceam_inputs
+from gbd_mapping import covariates
+from vivarium_gbd_access import gbd
 
 class ArtifactTool():
     # TODO Map parameters to their names ceam_inputs.risk_factors.child_stunting
@@ -14,7 +17,9 @@ class ArtifactTool():
         self._hdf = pd.HDFStore(path)
         self._str = None
         self._parse_paths()
-        self._location = self._hdf.get("/dimensions/full_space").location.loc[0]
+        self._country = self._hdf.get("/dimensions/full_space").location.loc[0]
+        self._gbd_location_id = int(gbd.get_location_ids().query('location_name == "' + self._country +'"').location_id)
+        self.covariates = self._create_covariates()
 
     def _parse_paths(self):
         """ Parse the paths of each leaf in the HDF file. Pull out all causes
@@ -41,6 +46,14 @@ class ArtifactTool():
                 self._risks.add(path_list[1])
 
             self._str += str(item[0]) + "\n"
+
+    def _create_covariates(self):
+        covars = covariates.to_dict()
+        covars = {c: covars[c]['gbd_id'] for c in covars}
+        return SimpleNamespace(**covars)
+
+    def get_covariate(self, covars):
+        return gbd.get_covariate_estimates([covars], self._gbd_location_id)
 
     @property
     def risks(self):
@@ -340,7 +353,7 @@ class ArtifactTool():
         assert n_rows >= 0
 
         results = pd.DataFrame([year] * n_rows, columns=['year'])
-        results['location'] = [self._location] * n_rows
+        results['location'] = [self._country] * n_rows
         results['sex'] = ["Both"] * n_rows
         return results
 
