@@ -8,9 +8,8 @@ import ceam_inputs
 from gbd_mapping import covariates
 from vivarium_gbd_access import gbd
 
+
 class ArtifactTool():
-    # TODO Map parameters to their names ceam_inputs.risk_factors.child_stunting
-    # TODO Write a query parser that checks if query is valid for table
 
     def __init__(self, path):
         self._path = path
@@ -18,7 +17,7 @@ class ArtifactTool():
         self._str = None
         self._parse_paths()
         self._country = self._hdf.get("/dimensions/full_space").location.loc[0]
-        self._gbd_location_id = int(gbd.get_location_ids().query('location_name == "' + self._country +'"').location_id)
+        self._gbd_location_id = int(gbd.get_location_ids().query('location_name == "' + self._country + '"').location_id)
         self.covariates = self._create_covariates()
 
     def _parse_paths(self):
@@ -142,7 +141,6 @@ class ArtifactTool():
         numerator = [weighted_risk[groups[risk]].sum() for risk in groups]
         denominator = [table.population[groups[risk]].sum() for risk in groups]
 
-
         cat_map = {cat: ceam_inputs.risk_factors[risk_factor].levels[cat] for cat in table.parameter.unique()}
 
         n_rows = len(groups)
@@ -201,7 +199,6 @@ class ArtifactTool():
         results['risk'] = list(groups.keys())
         results['PAF'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
         return results
-
 
     def CSMR_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
