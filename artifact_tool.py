@@ -45,9 +45,10 @@ class ArtifactTool():
         self.covariates = self._create_covariates()
 
     def _parse_paths(self):
-        """ Parse the paths of each leaf in the HDF file. Pull out all causes
-        and risks. Also create a string that gives the path and structure of
-        the hdf that the user gets when they print the AT.
+        """ Parse the paths of the hdf in order to:
+            - create a string representing the hdf
+            - collect each cause and risk
+            - store path information in the AT
         """
         self._causes = set()
         self._risks = set()
@@ -91,6 +92,10 @@ class ArtifactTool():
     @property
     def causes(self):
         return self._causes
+
+    @property
+    def location(self):
+        return self._country
 
     def __str__(self):
         return self._str
