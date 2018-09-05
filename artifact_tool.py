@@ -218,8 +218,8 @@ class ArtifactTool():
         tmp_risks = self._risks.copy()
         table = self.SEV_for_year_with_age_limit(tmp_risks.pop(), year, lower, upper)
         for risk_factor in tmp_risks:
-            table.append(self.SEV_for_year_with_age_limit(risk_factor, year, lower, upper))
-        return table
+            table = table.append(self.SEV_for_year_with_age_limit(risk_factor, year, lower, upper))
+        return table.reset_index()
 
     def PAF_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
@@ -242,6 +242,14 @@ class ArtifactTool():
         results['PAF'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
         return results
 
+    def PAF_all_causes_for_year_with_age_limit(self, year: int=2016, lower: float=0, upper: float=5):
+        tmp_causes = self._causes.copy()
+        tmp_causes.remove('all_causes')
+        table = self.PAF_for_year_with_age_limit(tmp_causes.pop(), year, lower, upper)
+        for cause in tmp_causes:
+            table = table.append(self.PAF_for_year_with_age_limit(cause, year, lower, upper))
+        return table.reset_index()
+
     def CSMR_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
 
@@ -256,6 +264,14 @@ class ArtifactTool():
         results['CSMR'] = [(table.value_mean * table.population).sum() / table.population.sum()]
         return results
 
+    def CSMR_all_causes_for_year_with_age_limit(self, year: int=2016, lower: float=0, upper: float=5):
+        tmp_causes = self._causes.copy()
+        tmp_causes.remove('all_causes')
+        table = self.CSMR_for_year_with_age_limit(tmp_causes.pop(), year, lower, upper)
+        for cause in tmp_causes:
+            table = table.append(self.CSMR_for_year_with_age_limit(cause, year, lower, upper))
+        return table.reset_index()
+
     def incidence_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
         assert cause in self._causes, "cause is not in the Artifact"
 
@@ -269,6 +285,14 @@ class ArtifactTool():
         results['cause'] = [cause] * n_rows
         results['incidence'] = [(table.value_mean * table.population).sum() / table.population.sum()]
         return results
+
+    def incidence_all_causes_for_year_with_age_limit(self, year: int=2016, lower: float=0, upper: float=5):
+        tmp_causes = self._causes.copy()
+        tmp_causes.remove('all_causes')
+        table = self.incidence_for_year_with_age_limit(tmp_causes.pop(), year, lower, upper)
+        for cause in tmp_causes:
+            table = table.append(self.incidence_for_year_with_age_limit(cause, year, lower, upper))
+        return table.reset_index()
 
     def reduce_draws(self, table: pd.DataFrame, val_col: str="value"):
         """Creates a DataFrame with mean and CI values obtained across draws.
