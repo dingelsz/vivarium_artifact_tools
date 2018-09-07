@@ -48,8 +48,6 @@ class ArtifactTool():
         self._hdf = pd.HDFStore(path)
         self._str = None
         self._parse_paths()
-        self.covariates = self._create_covariates()
-        self.locations = self._create_locations()
 
     def _parse_paths(self):
         """ Parse the paths of the hdf in order to:
@@ -73,17 +71,6 @@ class ArtifactTool():
             self._str += str(path) + "\n"
 
         self.tables = path_parser.to_namespace(self._get_table)
-
-    def _create_covariates(self):
-        covars = covariates.to_dict()
-        covars = {c: partial(gbd.get_covariate_estimates, [covars[c]['gbd_id']]) for c in covars}
-
-        return SimpleNamespace(**covars)
-
-    def _create_locations(self):
-        location_table = gbd.get_location_ids()
-        location_map = dict(zip(location_table.location_name, location_table.location_id))
-        return SimpleNamespace(**location_map)
 
     def _get_table(self, path):
         return self._hdf.get(path)

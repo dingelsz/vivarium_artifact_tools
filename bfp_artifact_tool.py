@@ -1,7 +1,7 @@
-from artifact_tool import *
+from gbd_artifact_tool import *
 
 
-class BFP_ArtifactTool(ArtifactTool):
+class BFP_ArtifactTool(GBD_ArtifactTool):
 
     def __init__(self, path):
         super().__init__(path)
