@@ -11,10 +11,7 @@ class BFP_ArtifactTool(ArtifactTool):
         self.covariates = self._bfp_covariates()
 
     def _bfp_parse_paths(self):
-        """ Parse the paths of the hdf in order to:
-            - create a string representing the hdf
-            - collect each cause and risk
-            - store path information in the AT
+        """ Parse the paths for risks and causes
         """
         self._causes = set()
         self._risks = set()

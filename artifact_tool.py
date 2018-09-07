@@ -13,30 +13,35 @@ from vivarium_gbd_access import gbd
 class ArtifactTool():
 
     class _HDF_Path_Parser():
-        def __init__(self):
+        def __init__(self, level_indicator="/", data_name="table", hide_path = False):
+            self.level_indicator = level_indicator
+            self.data_name = data_name
+            self.hide_path = hide_path
             self.root = {}
 
+
         def add(self, path):
-            nodes = path.split("/")[1:]
+            nodes = path.split(self.level_indicator)[1:]
             level = self.root
             while len(nodes) > 0:
                 current_node = nodes.pop(0)
                 if current_node not in level:
                     level[current_node] = {}
                 level = level[current_node]
-            level['table'] = path
+            level['full_path'] = path
 
         def to_namespace(self, func):
             return self._dict_to_namespace(self.root, func)
 
-        def _dict_to_namespace(self, root, func):
-            for key in root:
-                if key == 'table':
-                    continue
-                root[key] = self._dict_to_namespace(root[key], func)
-            if 'table' in root:
-                root['table'] = partial(func, root['table'])
-            return SimpleNamespace(**root)
+        def _dict_to_namespace(self, level, func):
+            for key in level:
+                if key != 'full_path':
+                    level[key] = self._dict_to_namespace(level[key], func)
+            if 'full_path' in level:
+                level[self.data_name] = partial(func, level['full_path'])
+                if self.hide_path:
+                    level.pop('full_path')
+            return SimpleNamespace(**level)
 
     def __init__(self, path):
         assert os.path.isfile(path), (path + " does not exist")
@@ -50,7 +55,6 @@ class ArtifactTool():
     def _parse_paths(self):
         """ Parse the paths of the hdf in order to:
             - create a string representing the hdf
-            - collect each cause and risk
             - store path information in the AT
         """
         self._str = "HDF: " + self._path + "\n"
