@@ -264,7 +264,6 @@ class BFP_ArtifactTool(ArtifactTool):
 
         return result_df
 
-
     def append_population(self, table: pd.DataFrame):
         """ Appends a new column with population data based on a rows location,
             on age, sex and year.
@@ -299,7 +298,6 @@ class BFP_ArtifactTool(ArtifactTool):
 
         pop_table = pop_table.drop(columns=['hash'])
         return table
-
 
     def _get_table_for_year_with_age_limit(self, path, year, lower, upper):
         """

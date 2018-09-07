@@ -13,12 +13,11 @@ from vivarium_gbd_access import gbd
 class ArtifactTool():
 
     class _HDF_Path_Parser():
-        def __init__(self, level_indicator="/", data_name="table", hide_path = False):
+        def __init__(self, level_indicator: str="/", data_name: str="table", hide_path: str=False):
             self.level_indicator = level_indicator
             self.data_name = data_name
             self.hide_path = hide_path
             self.root = {}
-
 
         def add(self, path):
             nodes = path.split(self.level_indicator)[1:]
@@ -83,7 +82,7 @@ class ArtifactTool():
 
     def _create_locations(self):
         location_table = gbd.get_location_ids()
-        location_map = dict(list(zip(location_table.location_name, location_table.location_id)))
+        location_map = dict(zip(location_table.location_name, location_table.location_id))
         return SimpleNamespace(**location_map)
 
     def _get_table(self, path):
