@@ -1,4 +1,5 @@
 from artifact_tool import *
+from gbd_mapping import covariates
 
 
 class GBD_ArtifactTool(ArtifactTool):

@@ -1,5 +1,5 @@
 from gbd_artifact_tool import *
-
+from gbd_mapping import covariates
 
 class BFP_ArtifactTool(GBD_ArtifactTool):
 
@@ -72,9 +72,13 @@ class BFP_ArtifactTool(GBD_ArtifactTool):
         table = self.append_population(table)
 
         exposed = table.value_mean * table.population
+        exposed_lower = table.lower * table.population
+        exposed_upper = table.upper * table.population
 
         groups = table.groupby(['parameter']).groups
         numerator = [exposed[groups[risk]].sum() for risk in groups]
+        numerator_lower = [exposed_lower[groups[risk]].sum() for risk in groups]
+        numerator_upper = [exposed_upper[groups[risk]].sum() for risk in groups]
         denominator = [table.population[groups[risk]].sum() for risk in groups]
 
         cat_map = {cat: ceam_inputs.risk_factors[risk_factor].levels[cat] for cat in table.parameter.unique()}
@@ -84,6 +88,8 @@ class BFP_ArtifactTool(GBD_ArtifactTool):
         results['risk'] = [risk_factor] * n_rows
         results['parameter'] = pd.Series(list(groups.keys())).map(cat_map)
         results['exposure_rate'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
+        results['exposure_rate_lower'] = [numerator_lower[i] / denominator[i] for i in range(len(numerator))]
+        results['exposure_rate_upper'] = [numerator_upper[i] / denominator[i] for i in range(len(numerator))]
         return results
 
     @lru_cache(maxsize=32)
@@ -95,9 +101,13 @@ class BFP_ArtifactTool(GBD_ArtifactTool):
         table = self.append_population(table)
 
         weighted_risk = table.population * table.value_mean
+        weighted_risk_lower = table.population * table.lower
+        weighted_risk_upper = table.population * table.upper
 
         groups = table.groupby(['cause', 'parameter']).groups
         numerator = [weighted_risk[groups[risk]].sum() for risk in groups]
+        numerator_lower = [weighted_risk_lower[groups[risk]].sum() for risk in groups]
+        numerator_upper = [weighted_risk_upper[groups[risk]].sum() for risk in groups]
         denominator = [table.population[groups[risk]].sum() for risk in groups]
 
         cat_map = {cat: ceam_inputs.risk_factors[risk_factor].levels[cat] for cat in table.parameter.unique()}
@@ -109,6 +119,8 @@ class BFP_ArtifactTool(GBD_ArtifactTool):
         results['parameter'] = pd.Series(parameters).map(cat_map)
         results['cause'] = causes
         results['relative_risk'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
+        results['relative_risk_lower'] = [numerator_lower[i] / denominator[i] for i in range(len(numerator))]
+        results['relative_risk_upper'] = [numerator_upper[i] / denominator[i] for i in range(len(numerator))]
         return results
 
     def SEV_for_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: float=0, upper: float=5):
@@ -119,11 +131,18 @@ class BFP_ArtifactTool(GBD_ArtifactTool):
         if risk_factor == "non_exclusive_breastfeeding":
             lower = 0.04
             upper = 1
+        if risk_factor == "child_stunting":
+            lower = 0.5
+            upper = 3
 
-        exposure_table = self.exposure_rates_by_year_with_age_limit(risk_factor, year, lower, upper)
+
         rr_table = self.relative_risk_by_year_with_age_limit(risk_factor, year, lower, upper)
+        exposure_table = self.exposure_rates_by_year_with_age_limit(risk_factor, year, lower, upper)
+        print(exposure_table)
         table = rr_table.sort_values(by=['cause', 'parameter'])
         table['exposure'] = exposure_table.exposure_rate.tolist() * len(rr_table.cause.unique())
+        table['exposure_lower'] = exposure_table.exposure_rate_lower.tolist() * len(rr_table.cause.unique())
+        table['exposure_upper'] = exposure_table.exposure_rate_upper.tolist() * len(rr_table.cause.unique())
 
         numerator = table.relative_risk * table.exposure
 
@@ -258,8 +277,8 @@ class BFP_ArtifactTool(GBD_ArtifactTool):
         # stats we want
         result_df = drawless_table[columns].sort_values(by=columns)
         result_df[val_col + "_mean"] = [value_df[col].values.mean() for col in identifiers]
-        result_df['lower 2.5'] = [np.percentile(value_df[col].values, 2.5) for col in identifiers]
-        result_df['upper 97.5'] = [np.percentile(value_df[col].values, 97.5) for col in identifiers]
+        result_df['lower'] = [np.percentile(value_df[col].values, 2.5) for col in identifiers]
+        result_df['upper'] = [np.percentile(value_df[col].values, 97.5) for col in identifiers]
         result_df = result_df.reset_index(drop=True)
 
         return result_df
