@@ -1,5 +1,5 @@
 import pandas as pd
-from artifact_tool import ArtifactTool
+from bfp_artifact_tool import BFP_ArtifactTool
 import glob
 
 
@@ -8,11 +8,14 @@ artifact_paths.remove('/share/scratch/users/abie/bfp_sierra_leone.hdf')
 artifact_paths.remove('/share/scratch/users/abie/bfp_sierra-leone.hdf')
 artifact_paths.remove('/share/scratch/users/abie/bfp_Chad.hdf')
 artifact_paths.remove('/share/scratch/users/abie/bfp_2.hdf')
+artifact_paths.remove('/share/scratch/users/abie/bfp_2.hdf.hdf')
+artifact_paths.remove('/share/scratch/users/abie/bfp_nigeria.hdf.hdf')
+print(artifact_paths)
 
 country_dict = {}
 for path in artifact_paths:
     print(path)
-    at = ArtifactTool(path)
+    at = BFP_ArtifactTool(path)
     stat_dict = {}
 
     stat_dict['population'] = at.population_for_year(2016)
@@ -47,13 +50,11 @@ for path in artifact_paths:
     stat_dict['SDI'] = at.covariates.socio_demographic_index().query('year_id == 2016').mean_value.values[0]
     stat_dict['ten year lag distributed energy per capita'] = at.covariates.ten_year_lag_distributed_energy_per_capita().query('year_id == 2016').mean_value.values[0]
     stat_dict['SBA'] = at.covariates.skilled_birth_attendance_proportion().query('year_id == 2016').mean_value.values[0]
-    stat_dict['SEV unsafe water'] = at.covariates.sev_unsafe_water().query('year_id == 2016').mean_value.values[0]
-    stat_dict['SEV unsafe sanitation'] = at.covariates.sev_unsafe_sanitation().query('year_id == 2016').mean_value.values[0]
     stat_dict['no access to handwashing facility'] = at.covariates.no_access_to_handwashing_facility().query('year_id == 2016').mean_value.values[0]
     stat_dict['education years per capita'] = at.covariates.education_years_per_capita().query('year_id == 2016').mean_value.values[0]
 
     # Save the dictionary
-    country_dict[path] = stat_dict
+    country_dict[at.location] = stat_dict
     del(at)
 table = pd.DataFrame(country_dict)
 table.to_csv('table.csv')

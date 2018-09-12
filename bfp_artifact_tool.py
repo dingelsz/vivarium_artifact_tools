@@ -134,11 +134,16 @@ class BFP_ArtifactTool(GBD_ArtifactTool):
         if risk_factor == "child_stunting":
             lower = 0.5
             upper = 3
-
+        if risk_factor == "child_underweight":
+            lower = 0.5
+            upper = 3
+        if risk_factor == "child_wasting":
+            lower = 0.5
+            upper = 3
 
         rr_table = self.relative_risk_by_year_with_age_limit(risk_factor, year, lower, upper)
         exposure_table = self.exposure_rates_by_year_with_age_limit(risk_factor, year, lower, upper)
-        print(exposure_table)
+        exposure_table = exposure_table.sort_values(by=['parameter'])
         table = rr_table.sort_values(by=['cause', 'parameter'])
         table['exposure'] = exposure_table.exposure_rate.tolist() * len(rr_table.cause.unique())
         table['exposure_lower'] = exposure_table.exposure_rate_lower.tolist() * len(rr_table.cause.unique())
@@ -164,33 +169,31 @@ class BFP_ArtifactTool(GBD_ArtifactTool):
             table = table.append(self.SEV_for_year_with_age_limit(risk_factor, year, lower, upper))
         return table.reset_index()
 
-    def PAF_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
-        assert cause in self._causes, "cause is not in the Artifact"
-        assert cause != 'all_causes', "all_causes does not have a PAF"
+    def PAF_for_year_with_age_limit(self, risk_factor: str, year: int=2016, lower: float=0, upper: float=5):
+        assert risk_factor in self._risks, "risk is not in the Artifact"
 
-        table = self._get_table_for_year_with_age_limit('/cause/' + cause + '/population_attributable_fraction', year, lower, upper)
-        table = self.reduce_draws(table)
-        table = self.append_population(table)
+        exp_table = self.exposure_rates_by_year_with_age_limit(risk_factor, year, lower, upper)
+        rr_table = self.relative_risk_by_year_with_age_limit(risk_factor, year, lower, upper)
 
-        weighted_paf = table.value_mean * table.population
+        table = rr_table
+        table['exposure_rate'] = exp_table.exposure_rate.tolist() * len(rr_table.cause.unique())
 
-        groups = table.groupby(by=["risk"]).groups
-        numerator = [weighted_paf[groups[risk]].sum() for risk in groups]
-        denominator = [table.population[groups[risk]].sum() for risk in groups]
+        product = table.exposure_rate * table.relative_risk
+        groups = table.groupby(['cause']).groups
+        paf = [(product[groups[cause]].sum() - 1) / product[groups[cause]].sum()  for cause in groups]
 
         n_rows = len(groups)
         results = self._default_result_table(year, n_rows)
-        results['cause'] = [cause] * n_rows
-        results['risk'] = list(groups.keys())
-        results['PAF'] = [numerator[i] / denominator[i] for i in range(len(numerator))]
+        results['cause'] = table.cause.unique()
+        results['risk'] = [risk_factor] * len(results.cause)
+        results['PAF'] = paf
         return results
 
-    def PAF_all_causes_for_year_with_age_limit(self, year: int=2016, lower: float=0, upper: float=5):
-        tmp_causes = self._causes.copy()
-        tmp_causes.remove('all_causes')
-        table = self.PAF_for_year_with_age_limit(tmp_causes.pop(), year, lower, upper)
-        for cause in tmp_causes:
-            table = table.append(self.PAF_for_year_with_age_limit(cause, year, lower, upper))
+    def PAF_all_risks_for_year_with_age_limit(self, year: int=2016, lower: float=0, upper: float=5):
+        tmp_risks = self._risks.copy()
+        table = self.PAF_for_year_with_age_limit(tmp_risks.pop(), year, lower, upper)
+        for risk in tmp_risks:
+            table = table.append(self.PAF_for_year_with_age_limit(risk, year, lower, upper))
         return table.reset_index()
 
     def CSMR_for_year_with_age_limit(self, cause: str, year: int=2016, lower: float=0, upper: float=5):
@@ -236,6 +239,11 @@ class BFP_ArtifactTool(GBD_ArtifactTool):
         for cause in tmp_causes:
             table = table.append(self.incidence_for_year_with_age_limit(cause, year, lower, upper))
         return table.reset_index()
+
+    def SEV_unsafe_water_for_year_under5(self, year: int=2016):
+        table = at.covariates.sev_unsafe_water()
+        table = table[table.year_id == year]
+        table = table[table.age_group_id <= 5]
 
     def reduce_draws(self, table: pd.DataFrame, val_col: str="value"):
         """Creates a DataFrame with mean and CI values obtained across draws.
