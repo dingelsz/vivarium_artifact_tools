@@ -1,4 +1,5 @@
 import pandas as pd
+import datetime
 from bfp_artifact_tool import BFP_ArtifactTool
 import glob
 
@@ -14,7 +15,7 @@ print(artifact_paths)
 
 country_dict = {}
 for path in artifact_paths:
-    print(path)
+    print(str(datetime.datetime.now()) + ' -- ' + str(path))
     at = BFP_ArtifactTool(path)
     stat_dict = {}
 
@@ -25,19 +26,19 @@ for path in artifact_paths:
 
     # SEV's
     sev = at.SEV_all_risk_factors_for_year_with_age_limit(2016, 0, 5)
-    for i, key in enumerate("SEV for: " + sev.risk + "/" + sev.cause):
+    for i, key in enumerate("SEV/" + sev.risk + "/" + sev.cause):
         stat_dict[key] = sev.SEV.loc[i]
     # PAF's
-    paf = at.PAF_all_causes_for_year_with_age_limit(2016, 0, 5)
-    for i, key in enumerate("PAF for: " + paf.risk + "/" + paf.cause):
+    paf = at.PAF_all_risks_for_year_with_age_limit(2016, 0, 5)
+    for i, key in enumerate("PAF/" + paf.risk + "/" + paf.cause):
         stat_dict[key] = paf.PAF.loc[i]
     # CSMR
     csmr = at.CSMR_all_causes_for_year_with_age_limit(2016, 0, 5)
-    for i, key in enumerate("CSMR for: " + csmr.cause):
+    for i, key in enumerate("CSMR/" + csmr.cause):
         stat_dict[key] = csmr.CSMR.loc[i]
     # incidence
     incidence = at.incidence_all_causes_for_year_with_age_limit(2016, 0, 5)
-    for i, key in enumerate("incidence for: " + incidence.cause):
+    for i, key in enumerate("incidence/" + incidence.cause):
         stat_dict[key] = incidence.incidence.loc[i]
 
     ##### Covariates

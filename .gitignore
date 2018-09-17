@@ -3,6 +3,7 @@ _*.py
 .pytest_cache
 /__pycache__/
 ._*
-/cluster.py
 /~*
 /table.*
+*.png
+*.csv
