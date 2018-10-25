@@ -5,7 +5,7 @@ import os.path
 from functools import lru_cache, partial
 from types import SimpleNamespace
 
-import ceam_inputs
+import vivarium_inputs as ceam_inputs
 from gbd_mapping import covariates
 from vivarium_gbd_access import gbd
 
